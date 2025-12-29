@@ -1,0 +1,43 @@
+# Node
+node_modules/
+.pnpm-store/
+.npm/
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Env files
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Misc
+*.swp
+*.swo
+
+# Project specific
+.logs/
+.pids/
+.index-tmp/
+.claude/
+tmp.json
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride

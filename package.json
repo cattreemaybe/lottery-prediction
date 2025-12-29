@@ -1,0 +1,17 @@
+{
+  "name": "lottery-prediction-monorepo",
+  "version": "0.1.0",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm install --workspaces"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Monorepo for lottery prediction web application",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ]
+}

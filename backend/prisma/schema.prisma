@@ -1,0 +1,89 @@
+// Lottery Prediction Platform - Prisma Schema
+// Database schema for historical lottery data, predictions, and analytics
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Historical lottery draw records
+model LotteryDraw {
+  id       String   @id @default(cuid())
+  period   String   @unique // Draw period number (e.g., "2024001")
+  drawDate DateTime @map("draw_date") // Date of the draw
+  redBalls Int[]    @map("red_balls") // Array of 6 red ball numbers (1-33)
+  blueBall Int      @map("blue_ball") // Single blue ball number (1-16)
+
+  // Data source tracking
+  source     String   @default("manual") // manual | api | csv | excel
+  importedAt DateTime @default(now()) @map("imported_at")
+
+  // Indexes for performance
+  @@index([drawDate], map: "lottery_draws_draw_date_idx")
+  @@index([period], map: "lottery_draws_period_idx")
+  // Compound index for common queries: get recent draws sorted by date
+  @@index([drawDate(sort: Desc)], map: "lottery_draws_draw_date_desc_idx")
+  // Index for source filtering
+  @@index([source], map: "lottery_draws_source_idx")
+  @@map("lottery_draws")
+}
+
+// Prediction results storage
+model Prediction {
+  id          String @id @default(cuid())
+  redBalls    Int[]  @map("red_balls")
+  blueBall    Int    @map("blue_ball")
+  confidence  Float // Confidence score (0-100)
+  algorithm   String // Algorithm used: ensemble | frequency | trend | random_forest | lstm
+  datasetSize Int    @map("dataset_size") // Number of historical records used
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  // Optional: Link to actual draw result for accuracy tracking
+  resultPeriod String?  @map("result_period")
+  isCorrect    Boolean? @map("is_correct")
+
+  @@index([generatedAt], map: "predictions_generated_at_idx")
+  @@index([algorithm], map: "predictions_algorithm_idx")
+  // Compound index for history queries: recent predictions by algorithm
+  @@index([algorithm, generatedAt(sort: Desc)], map: "predictions_algo_date_desc_idx")
+  // Index for accuracy tracking queries
+  @@index([resultPeriod], map: "predictions_result_period_idx")
+  // Compound index for recent predictions sorted
+  @@index([generatedAt(sort: Desc)], map: "predictions_generated_at_desc_idx")
+  @@map("predictions")
+}
+
+// Algorithm performance tracking
+model AlgorithmPerformance {
+  id             String   @id @default(cuid())
+  algorithm      String   @unique
+  totalRuns      Int      @default(0) @map("total_runs")
+  successCount   Int      @default(0) @map("success_count") // Full matches
+  partialMatches Int      @default(0) @map("partial_matches") // Partial ball matches
+  avgConfidence  Float    @default(0) @map("avg_confidence")
+  lastRunAt      DateTime @default(now()) @map("last_run_at")
+
+  @@map("algorithm_performance")
+}
+
+// Data import logs
+model ImportLog {
+  id          String   @id @default(cuid())
+  filename    String
+  fileType    String   @map("file_type") // csv | excel
+  recordCount Int      @map("record_count")
+  skipCount   Int      @default(0) @map("skip_count") // Duplicates skipped
+  errorCount  Int      @default(0) @map("error_count")
+  status      String // success | partial | failed
+  errorMsg    String?  @map("error_msg")
+  importedAt  DateTime @default(now()) @map("imported_at")
+
+  @@index([importedAt])
+  @@map("import_logs")
+}
