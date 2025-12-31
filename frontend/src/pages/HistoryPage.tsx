@@ -11,31 +11,20 @@
  * Pos: frontend/src/pages/HistoryPage.tsx
  */
 
-import { useState, useRef, type ChangeEvent } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchLotteryDraws,
   fetchLotteryStats,
-  importLotteryFile,
-  downloadExcelTemplate,
-  downloadCsvTemplate,
   deleteLotteryDraw,
   type LotteryDraw,
 } from '../lib/api';
 
 export function HistoryPage() {
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
-  const [duplicateStrategy, setDuplicateStrategy] = useState<'skip' | 'replace' | 'error'>('skip');
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<{
-    inserted: number;
-    skipped: number;
-    errors: Array<{ row: number; error: string }>;
-  } | null>(null);
 
   // Fetch lottery data
   const { data: drawsData, isLoading: drawsLoading } = useQuery({
@@ -49,24 +38,6 @@ export function HistoryPage() {
     queryFn: fetchLotteryStats,
   });
 
-  // Import mutation
-  const importMutation = useMutation({
-    mutationFn: (file: File) => importLotteryFile(file, duplicateStrategy),
-    onSuccess: (data) => {
-      setImportResult(data.data);
-      setUploadError(null);
-      queryClient.invalidateQueries({ queryKey: ['lottery-draws'] });
-      queryClient.invalidateQueries({ queryKey: ['lottery-stats'] });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    },
-    onError: (error) => {
-      setUploadError(error instanceof Error ? error.message : '上传失败');
-      setImportResult(null);
-    },
-  });
-
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteLotteryDraw,
@@ -76,24 +47,6 @@ export function HistoryPage() {
     },
   });
 
-  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-    if (!['csv', 'xlsx', 'xls'].includes(fileExt || '')) {
-      setUploadError('只支持 .xlsx, .xls, .csv 格式文件');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('文件大小不能超过 10MB');
-      return;
-    }
-
-    importMutation.mutate(file);
-  };
-
   const handleDelete = (period: string) => {
     if (confirm(`确定要删除期号 ${period} 的记录吗?`)) {
       deleteMutation.mutate(period);
@@ -102,14 +55,13 @@ export function HistoryPage() {
 
   const draws = drawsData?.data || [];
   const pagination = drawsData?.pagination;
-  const isUploading = importMutation.isPending;
 
   return (
     <section className="space-y-8">
       <header className="space-y-3">
         <h2 className="text-2xl font-semibold text-white">历史数据管理</h2>
         <p className="text-sm text-slate-300">
-          导入或查看双色球历史开奖记录。支持 Excel 和 CSV 格式导入,自动检测重复期号。
+          查看双色球历史开奖记录。数据已自动从官方网站同步。
         </p>
       </header>
 
@@ -199,106 +151,6 @@ export function HistoryPage() {
             </>
           )}
         </div>
-
-        {/* Sidebar */}
-        <aside className="space-y-4">
-          {/* Import Section */}
-          <div className="rounded-3xl border border-dashed border-primary/60 bg-primary/5 p-6 text-sm text-slate-200">
-            <h3 className="text-base font-semibold text-white">导入历史数据</h3>
-            <p className="mt-2 text-xs text-slate-300">
-              支持 .xlsx / .xls / .csv 文件，单文件不超过 10MB
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <label className="block">
-                <span className="text-xs text-slate-400">重复处理策略</span>
-                <select
-                  value={duplicateStrategy}
-                  onChange={(e) => setDuplicateStrategy(e.target.value as 'skip' | 'replace' | 'error')}
-                  className="mt-1 w-full rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                >
-                  <option value="skip">跳过重复期号</option>
-                  <option value="replace">替换已有数据</option>
-                  <option value="error">遇到重复则报错</option>
-                </select>
-              </label>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isUploading ? '上传中...' : '选择文件上传'}
-              </button>
-            </div>
-
-            {/* Upload Result */}
-            {uploadError && (
-              <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-100">
-                <p className="font-semibold">上传失败</p>
-                <p className="mt-1">{uploadError}</p>
-              </div>
-            )}
-
-            {importResult && (
-              <div className="mt-4 rounded-2xl border border-green-500/40 bg-green-500/10 p-3 text-xs text-green-100">
-                <p className="font-semibold">导入完成</p>
-                <ul className="mt-2 space-y-1">
-                  <li>✓ 成功导入: {importResult.inserted} 条</li>
-                  {importResult.skipped > 0 && <li>⊘ 跳过重复: {importResult.skipped} 条</li>}
-                  {importResult.errors.length > 0 && (
-                    <li className="text-yellow-200">⚠ 错误: {importResult.errors.length} 条</li>
-                  )}
-                </ul>
-                {importResult.errors.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-yellow-200">查看错误详情</summary>
-                    <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-[11px]">
-                      {importResult.errors.slice(0, 10).map((err) => (
-                        <li key={err.row}>
-                          第 {err.row} 行: {err.error}
-                        </li>
-                      ))}
-                      {importResult.errors.length > 10 && (
-                        <li className="text-slate-400">... 还有 {importResult.errors.length - 10} 条错误</li>
-                      )}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Template Download */}
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-300">
-            <h3 className="text-base font-semibold text-white">下载数据模板</h3>
-            <p className="mt-2 text-xs text-slate-400">
-              模板包含示例数据和字段说明，帮助您快速准备导入文件
-            </p>
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={downloadExcelTemplate}
-                className="w-full rounded-full border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
-              >
-                下载 Excel 模板
-              </button>
-              <button
-                onClick={downloadCsvTemplate}
-                className="w-full rounded-full border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
-              >
-                下载 CSV 模板
-              </button>
-            </div>
-          </div>
-        </aside>
       </div>
     </section>
   );

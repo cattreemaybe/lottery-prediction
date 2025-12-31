@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 复制 package 文件
+COPY package*.json ./
+RUN npm install --production
+
+# 复制编译后的代码
+COPY dist ./dist
+COPY prisma ./prisma
+COPY .env ./
+
+# 启动调度器
+CMD ["node", "dist/scripts/schedule-ssq-sync.js"]

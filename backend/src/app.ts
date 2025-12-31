@@ -35,7 +35,7 @@ export function createApp() {
   );
   app.use(
     cors({
-      origin: runtimeConfig.nodeEnv === 'production' ? [/^https:\/\/.+/] : true,
+      origin: runtimeConfig.nodeEnv === 'production' ? [/^https?:\/\/.+/] : true,
       credentials: true,
     })
   );
@@ -45,7 +45,7 @@ export function createApp() {
   app.use(
     rateLimit({
       windowMs: 60 * 1000,
-      limit: 120,
+      limit: 30,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
     })

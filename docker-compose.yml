@@ -20,6 +20,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - lottery-network
 
   # Redis Cache
   redis:
@@ -36,6 +38,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - lottery-network
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: lottery-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - lottery-network
 
   # Backend API (Node.js)
   backend:
@@ -57,10 +76,8 @@ services:
       ML_SERVICE_BASE_URL: http://ml-service:8001/api
     ports:
       - '4000:4000'
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    command: npm run start
+    networks:
+      - lottery-network
 
   # ML Service (Python FastAPI)
   ml-service:
@@ -73,11 +90,27 @@ services:
       PYTHON_ENV: production
     ports:
       - '8001:8001'
-    volumes:
-      - ./ml-service:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+    networks:
+      - lottery-network
 
-  # Frontend (React + Vite) - Development only
+  # 爬虫调度器
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.scheduler
+    container_name: lottery-scheduler
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - postgres
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://lottery_user:lottery_pass@postgres:5432/lottery_db?schema=public
+      REDIS_URL: redis://redis:6379
+    networks:
+      - lottery-network
+
+  # Frontend (React + Vite) - Production build
   frontend:
     build:
       context: ./frontend
@@ -87,13 +120,11 @@ services:
     depends_on:
       - backend
     environment:
-      VITE_API_BASE_URL: http://localhost:4000/api
+      VITE_API_BASE_URL: /api
     ports:
       - '5173:5173'
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host
+    networks:
+      - lottery-network
 
 volumes:
   postgres_data:

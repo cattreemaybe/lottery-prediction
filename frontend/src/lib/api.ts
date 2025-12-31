@@ -43,7 +43,6 @@ export interface ConstantsResponse {
   defaultPageSize: number;
   redBallRange: { min: number; max: number; picks: number };
   blueBallRange: { min: number; max: number; picks: number };
-  fileUploadLimitMb: number;
   predictionTimeoutSeconds: number;
   apiResponseTimeoutSeconds: number;
 }
@@ -252,16 +251,6 @@ interface LotteryStatsApiResponse {
   };
 }
 
-interface ImportResultApiResponse {
-  success: boolean;
-  message: string;
-  data: {
-    inserted: number;
-    skipped: number;
-    errors: Array<{ row: number; error: string }>;
-  };
-}
-
 export async function fetchLotteryDraws(params?: {
   page?: number;
   pageSize?: number;
@@ -301,50 +290,6 @@ export async function fetchTrendData(limit = 20) {
     params: { limit },
   });
   return data.data;
-}
-
-export async function importLotteryFile(file: File, onDuplicate: 'skip' | 'replace' | 'error' = 'skip') {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const { data } = await apiClient.post<ImportResultApiResponse>('/lottery/import', formData, {
-    params: { onDuplicate },
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  return data;
-}
-
-export async function downloadExcelTemplate() {
-  const response = await apiClient.get('/lottery/template/excel', {
-    responseType: 'blob',
-  });
-
-  const url = window.URL.createObjectURL(new Blob([response.data]));
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', 'lottery-template.xlsx');
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-}
-
-export async function downloadCsvTemplate() {
-  const response = await apiClient.get('/lottery/template/csv', {
-    responseType: 'blob',
-  });
-
-  const url = window.URL.createObjectURL(new Blob([response.data]));
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', 'lottery-template.csv');
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
 }
 
 export async function deleteLotteryDraw(period: string) {

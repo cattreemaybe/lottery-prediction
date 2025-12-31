@@ -43,17 +43,17 @@ export function DashboardPage() {
 
   const historyDescription = stats?.dateRange
     ? `${formatDate(stats.dateRange.from)} 至 ${formatDate(stats.dateRange.to)}`
-    : '上传历史开奖数据以激活预测功能';
+    : '等待自动爬取数据以激活预测功能';
 
   const latestPeriodValue = stats?.latestDraw?.period
     ? `第 ${stats.latestDraw.period} 期`
     : statsLoading
       ? '加载中...'
-      : '待导入';
+      : '待爬取';
 
   const latestPeriodDescription = stats?.latestDraw
-    ? `${formatDate(stats.latestDraw.drawDate)} 开奖 · 来源 ${stats.latestDraw.source || '手动'}`
-    : '支持 Excel / CSV 增量导入并提供模板';
+    ? `${formatDate(stats.latestDraw.drawDate)} 开奖 · 来源 ${stats.latestDraw.source || '自动'}`
+    : '数据自动从官方网站同步';
 
   const predictionValue = predictionLoading
     ? '加载中...'
@@ -107,11 +107,10 @@ export function DashboardPage() {
       <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-8 shadow-xl shadow-slate-950/30">
         <h2 className="text-xl font-semibold text-white">快速开始指南</h2>
         <ol className="mt-4 space-y-3 text-sm text-slate-300">
-          <li>1. 下载数据模板，整理至少50期历史开奖记录。</li>
-          <li>2. 在“历史数据”页面上传Excel或CSV文件并处理冲突。</li>
-          <li>3. 在“号码预测”页面选择算法和数据范围并发起预测。</li>
-          <li>4. 在“统计分析”页面查看频率/趋势图表，验证预测依据。</li>
-          <li>5. 在“算法管理”页面了解不同算法的说明与历史表现。</li>
+          <li>1. 系统已自动从官方网站爬取历史开奖记录。</li>
+          <li>2. 在"号码预测"页面选择算法和数据范围并发起预测。</li>
+          <li>3. 在"统计分析"页面查看频率/趋势图表，验证预测依据。</li>
+          <li>4. 在"算法管理"页面了解不同算法的说明与历史表现。</li>
         </ol>
         <p className="mt-6 text-xs text-slate-500">
           提示：预测算法将在5秒内返回结果，如超时请检查数据完整性或稍后重试。

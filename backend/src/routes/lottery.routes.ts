@@ -17,42 +17,13 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
-import multer from 'multer';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { cacheGet, cacheSet, cacheDelPattern, CacheKeys } from '../lib/redis';
-import {
-  parseExcelFile,
-  parseCsvFile,
-  importLotteryDraws,
-  generateExcelTemplate,
-  generateCsvTemplate,
-  type ConflictStrategy,
-} from '../services/data-import';
 import { getFrequencyStats } from '../services/lottery-stats';
 import { fetchTrendData } from '../services/lottery-trends';
 
 export const lotteryRouter = Router();
-
-// Configure multer for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-  },
-  fileFilter: (_req, file, cb) => {
-    const allowedMimes = [
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/csv',
-    ];
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('只支持 Excel (.xlsx, .xls) 或 CSV 文件'));
-    }
-  },
-});
 
 // Query schemas
 const listQuerySchema = z.object({
@@ -60,10 +31,6 @@ const listQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
   sortBy: z.enum(['drawDate', 'period']).default('drawDate'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
-});
-
-const importQuerySchema = z.object({
-  onDuplicate: z.enum(['skip', 'replace', 'error']).default('skip'),
 });
 
 const frequencyQuerySchema = z.object({
@@ -203,89 +170,6 @@ lotteryRouter.get('/draws/:period', async (req: Request, res: Response, next: Ne
   } catch (error) {
     next(error);
   }
-});
-
-/**
- * POST /api/lottery/import
- * Import lottery data from Excel or CSV file
- */
-lotteryRouter.post(
-  '/import',
-  upload.single('file'),
-  async (req: Request, res: Response) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: '请上传文件',
-        });
-      }
-
-      const query = importQuerySchema.parse(req.query);
-      const strategy: ConflictStrategy = { onDuplicate: query.onDuplicate };
-
-      let parsedData;
-      const fileExt = req.file.originalname.split('.').pop()?.toLowerCase();
-
-      if (fileExt === 'csv') {
-        parsedData = parseCsvFile(req.file.buffer);
-      } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-        parsedData = parseExcelFile(req.file.buffer);
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: '不支持的文件格式',
-        });
-      }
-
-      const result = await importLotteryDraws(parsedData, strategy, fileExt);
-
-      res.json({
-        success: result.success,
-        message: result.message,
-        data: {
-          inserted: result.inserted,
-          skipped: result.skipped,
-          errors: result.errors,
-        },
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: '请求参数不合法',
-          errors: error.flatten(),
-        });
-      }
-
-      res.status(400).json({
-        success: false,
-        message: error instanceof Error ? error.message : '导入失败',
-      });
-    }
-  }
-);
-
-/**
- * GET /api/lottery/template/excel
- * Download Excel template
- */
-lotteryRouter.get('/template/excel', (_req: Request, res: Response) => {
-  const buffer = generateExcelTemplate();
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename=lottery-template.xlsx');
-  res.send(buffer);
-});
-
-/**
- * GET /api/lottery/template/csv
- * Download CSV template
- */
-lotteryRouter.get('/template/csv', (_req: Request, res: Response) => {
-  const csvContent = generateCsvTemplate();
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename=lottery-template.csv');
-  res.send('\uFEFF' + csvContent); // Add BOM for Excel UTF-8 support
 });
 
 /**

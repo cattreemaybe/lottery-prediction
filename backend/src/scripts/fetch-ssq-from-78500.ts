@@ -1,9 +1,6 @@
 import 'dotenv/config';
 import iconv from 'iconv-lite';
 import { load } from 'cheerio';
-
-import type { LotteryDrawInput } from '../services/data-import';
-import { importLotteryDraws } from '../services/data-import';
 import { prisma } from '../lib/prisma';
 
 const TARGET_URL = 'https://kaijiang.78500.cn/ssq/';
@@ -28,9 +25,16 @@ async function fetchHtml(): Promise<string> {
   return iconv.decode(buffer, 'gb2312');
 }
 
-function parseDraws(html: string): LotteryDrawInput[] {
+interface ParsedDraw {
+  period: string;
+  drawDate: Date;
+  redBalls: number[];
+  blueBall: number;
+}
+
+function parseDraws(html: string): ParsedDraw[] {
   const $ = load(html);
-  const results: LotteryDrawInput[] = [];
+  const results: ParsedDraw[] = [];
 
   $('tbody.list-tr tr').each((_index, element) => {
     const cells = $(element).find('td');
@@ -90,10 +94,38 @@ export async function runSsqCrawler() {
   }
 
   console.log(`[crawler] 解析到 ${draws.length} 期数据，开始入库`);
-  const result = await importLotteryDraws(draws, { onDuplicate: 'skip' }, 'crawler-78500');
+
+  let inserted = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const draw of draws) {
+    try {
+      await prisma.lotteryDraw.upsert({
+        where: { period: draw.period },
+        update: {
+          drawDate: draw.drawDate,
+          redBalls: draw.redBalls,
+          blueBall: draw.blueBall,
+          source: 'crawler-78500',
+        },
+        create: {
+          period: draw.period,
+          drawDate: draw.drawDate,
+          redBalls: draw.redBalls,
+          blueBall: draw.blueBall,
+          source: 'crawler-78500',
+        },
+      });
+      inserted++;
+    } catch (error) {
+      console.error(`[crawler] 期号 ${draw.period} 入库失败：`, error);
+      errors++;
+    }
+  }
 
   console.log(
-    `[crawler] 导入完成：成功 ${result.inserted} 条，跳过 ${result.skipped} 条，错误 ${result.errors.length} 条`
+    `[crawler] 导入完成：成功 ${inserted} 条，跳过 ${skipped} 条，错误 ${errors} 条`
   );
 }
 

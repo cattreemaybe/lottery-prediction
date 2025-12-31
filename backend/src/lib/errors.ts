@@ -53,6 +53,7 @@ export class AppError extends Error {
   public readonly code: number;
   public readonly status: number;
   public readonly details?: unknown;
+  public cause?: Error;
 
   constructor(
     errorType: ErrorCode,
@@ -81,14 +82,26 @@ export class AppError extends Error {
   }
 
   toJSON() {
-    return {
+    const result: {
+      success: false;
+      error: {
+        code: number;
+        message: string;
+        details?: unknown;
+      };
+    } = {
       success: false,
       error: {
         code: this.code,
         message: this.message,
-        ...(this.details && { details: this.details }),
       },
     };
+    
+    if (this.details) {
+      result.error.details = this.details;
+    }
+    
+    return result;
   }
 }
 
