@@ -34,7 +34,6 @@ apiRouter.get('/constants', (_req, res) => {
     defaultPageSize: 50,
     redBallRange: { min: 1, max: 33, picks: 6 },
     blueBallRange: { min: 1, max: 16, picks: 1 },
-    fileUploadLimitMb: 10,
     predictionTimeoutSeconds: runtimeConfig.predictionTimeoutMs / 1000,
     apiResponseTimeoutSeconds: runtimeConfig.apiTimeoutMs / 1000,
   });

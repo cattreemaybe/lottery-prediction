@@ -27,7 +27,6 @@ describe('API Integration Tests', () => {
       expect(response.body).toHaveProperty('defaultPageSize');
       expect(response.body).toHaveProperty('redBallRange');
       expect(response.body).toHaveProperty('blueBallRange');
-      expect(response.body).toHaveProperty('fileUploadLimitMb');
       expect(response.body).toHaveProperty('predictionTimeoutSeconds');
       expect(response.body).toHaveProperty('apiResponseTimeoutSeconds');
     });
