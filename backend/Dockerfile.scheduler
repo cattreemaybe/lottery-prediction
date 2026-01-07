@@ -1,15 +1,33 @@
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+
+# Install dependencies
+RUN npm install --omit=dev
+
+# Copy source code
+COPY . .
+
+# Generate Prisma Client
+RUN npx -y prisma@6.16.3 generate
+
+# Build TypeScript
+RUN npm run build
+
+# Production stage
 FROM node:20-alpine
 
 WORKDIR /app
 
-# 复制 package 文件
-COPY package*.json ./
-RUN npm install --production
-
-# 复制编译后的代码
-COPY dist ./dist
-COPY prisma ./prisma
-COPY .env ./
+# Copy built files and dependencies
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma
 
 # 启动调度器
 CMD ["node", "dist/scripts/schedule-ssq-sync.js"]
