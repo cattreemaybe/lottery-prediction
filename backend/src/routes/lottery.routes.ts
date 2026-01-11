@@ -22,6 +22,7 @@ import { prisma } from '../lib/prisma';
 import { cacheGet, cacheSet, cacheDelPattern, CacheKeys } from '../lib/redis';
 import { getFrequencyStats } from '../services/lottery-stats';
 import { fetchTrendData } from '../services/lottery-trends';
+import { runSsqCrawler } from '../scripts/fetch-ssq-from-78500';
 
 export const lotteryRouter = Router();
 
@@ -269,6 +270,38 @@ lotteryRouter.delete('/draws/:period', async (req: Request, res: Response, next:
     res.json({
       success: true,
       message: `期号 ${period} 已删除`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/lottery/sync
+ * Manually trigger lottery data sync from crawler
+ */
+lotteryRouter.post('/sync', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    await runSsqCrawler();
+
+    await cacheDelPattern('lottery:*');
+    await cacheDelPattern('stats:*');
+
+    const totalDraws = await prisma.lotteryDraw.count();
+    const latestDraw = await prisma.lotteryDraw.findFirst({
+      orderBy: { drawDate: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      message: '数据同步完成',
+      data: {
+        totalDraws,
+        latestDraw: {
+          period: latestDraw?.period,
+          drawDate: latestDraw?.drawDate,
+        },
+      },
     });
   } catch (error) {
     next(error);
